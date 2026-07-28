@@ -64,6 +64,8 @@ python orchestrator/approve_and_publish.py --mall zigzag --category "..." --titl
 
 ## 현재 상태 (미구현/TODO)
 
-- `adapters/zigzag_mcp`, `adapters/ohouse_mcp` — 실제 API/스크래핑 로직 미구현 (스텁 상태)
-- `tools/naver_oauth_client.py` — 요청 파라미터는 네이버 개발자센터 최신 문서 기준 재검증 필요
+- `adapters/zigzag_mcp` — 구현 완료 (지그재그 내부 공개 GraphQL API 사용, 제휴 프로그램 없음 확인됨)
+- `adapters/ohouse_mcp` — 보류. Akamai WAF가 모든 요청을 403 차단해서 스크래핑 불가 판정.
+  파트너스 API 신청 또는 다른 몰로 교체 필요
+- `tools/naver_oauth_client.py` — 요청 파라미터는 네이버 개발자센터 최신 문서 기준 재검증 필요, 최초 OAuth 인가 플로우도 미구현
 - 테스트 스위트 없음

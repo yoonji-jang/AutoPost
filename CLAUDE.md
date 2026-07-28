@@ -44,11 +44,17 @@ python -m py_compile <file>.py                # 문법 검사 (린터 미도입 
 
 ## 중요한 미구현/불확실 지점 (TODO)
 
-- `adapters/zigzag_mcp`, `adapters/ohouse_mcp` — 현재 `NotImplementedError` 스텁. 실제 구현 전에 각 몰의
-  제휴/크리에이터 프로그램 API 유무부터 확인할 것 (없으면 스크래핑은 법적 리스크가 있어 이 어댑터 안에만 격리)
+- `adapters/zigzag_mcp` — **구현 완료**. 제휴 프로그램이 없어(2026-07 확인) 사이트 내부 공개 GraphQL API
+  (`api.zigzag.kr/api/2/graphql/GetSearchResult`, `GetCatalogProductDetailPageOption`)를 그대로 호출.
+  쿠키/로그인 불필요, `requests`만으로 동작 확인 완료. 쿼리 문자열은 `queries/*.graphql`에 원본 그대로 보관 —
+  사이트 스키마가 바뀌면 브라우저 네트워크 탭에서 재캡처해서 교체해야 함
+- `adapters/ohouse_mcp` — **보류**. `ohou.se`는 Akamai 엣지 WAF가 모든 요청(Playwright, 순수 `requests`
+  둘 다)을 403으로 차단함. 헤더/셀렉터 문제가 아니라 네트워크 단 봇 차단이라 우회는 시도하지 않기로 함.
+  재개하려면: (a) 오늘의집 파트너스/제휴 API 공식 신청, 또는 (b) 봇 차단이 약한 다른 리빙 카테고리 몰로 교체
 - `tools/naver_oauth_client.py` — 요청 파라미터명(title/contents/blogId 등)은 네이버 개발자센터 최신 문서
-  기준으로 반드시 재검증. 코드는 구조만 맞춰둔 상태
-- 테스트 스위트 없음. 변경 후에는 최소한 `python -m py_compile`로 문법만이라도 확인할 것
+  기준으로 반드시 재검증. 코드는 구조만 맞춰둔 상태. 최초 1회 OAuth 인가(authorization code → refresh_token)
+  플로우도 아직 없음
+- 테스트 스위트 없음. 변경 후에는 최소한 `python -m py_compile` + `ruff check .`로 확인할 것
 
 ## 안전 기본값
 

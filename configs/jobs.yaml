@@ -1,0 +1,16 @@
+jobs:
+  - mall: zigzag
+    category: "여성의류 > 블라우스"
+    topic: "여름 하객룩"
+    item_count: 5
+    style_profile: zigzag_zipmag
+    publish_target: naver_blog
+    schedule: "mon,wed,fri"
+
+  - mall: ohouse
+    category: "리빙 > 수납/정리"
+    topic: "원룸 정리 아이템"
+    item_count: 5
+    style_profile: ohouse_living
+    publish_target: naver_blog
+    schedule: "tue,thu"

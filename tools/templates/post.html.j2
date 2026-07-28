@@ -1,0 +1,15 @@
+<h1>{{ topic }}</h1>
+
+<div class="body">
+{{ body_text }}
+</div>
+
+{% for product in products %}
+<div class="product-block">
+  {% if image_paths.get(product.product_id) %}
+  <img src="{{ image_paths[product.product_id] }}" alt="{{ product.name }}">
+  {% endif %}
+  <p><strong>{{ product.name }}</strong> - {{ "{:,}".format(product.price) }}원</p>
+  <p><a href="{{ product.url }}" target="_blank" rel="nofollow sponsored">상품 보러가기</a></p>
+</div>
+{% endfor %}

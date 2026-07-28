@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import sys, json, subprocess\nd = json.load(sys.stdin)\nf = d.get('tool_input', {}).get('file_path', '')\nif not f.endswith('.py'):\n    sys.exit(0)\nr = subprocess.call([sys.executable, '-m', 'py_compile', f])\nsys.exit(r if r else subprocess.call(['ruff', 'check', f]))\"",
+            "timeout": 30,
+            "statusMessage": "Checking Python syntax + lint..."
+          }
+        ]
+      }
+    ]
+  }
+}

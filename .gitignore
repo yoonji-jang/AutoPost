@@ -1,0 +1,6 @@
+.env
+__pycache__/
+*.pyc
+.ruff_cache/
+history_db/*.db
+images/

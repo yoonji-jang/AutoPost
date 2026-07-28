@@ -1,0 +1,5 @@
+anthropic
+playwright
+pyyaml
+jinja2
+requests

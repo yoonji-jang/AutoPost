@@ -2,4 +2,6 @@ anthropic
 playwright
 pyyaml
 jinja2
+markupsafe
 requests
+python-dotenv

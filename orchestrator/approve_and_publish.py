@@ -8,8 +8,12 @@ from __future__ import annotations
 
 import argparse
 
-from agents import publisher
-from common.models import JobConfig
+from dotenv import load_dotenv
+
+load_dotenv()  # agents.publisher가 모듈 임포트 시점에 env var를 읽으므로 반드시 먼저 실행
+
+from agents import publisher  # noqa: E402
+from common.models import JobConfig  # noqa: E402
 
 
 def main() -> None:

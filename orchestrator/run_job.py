@@ -17,13 +17,24 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-import yaml
+from dotenv import load_dotenv
 
-import adapters  # noqa: F401  (import만으로 어댑터들을 AdapterRegistry에 등록)
-from agents import assembler, capture_agent, copywriter, notifier, product_scout, publisher
-from agents.qa_agent import QAFailure
-from agents.qa_agent import check as run_qa
-from common.models import JobConfig
+load_dotenv()  # agents.publisher/copywriter가 임포트 시점에 env var를 읽으므로 먼저 실행
+
+import yaml  # noqa: E402
+
+import adapters  # noqa: E402, F401  (import만으로 어댑터들을 AdapterRegistry에 등록)
+from agents import (  # noqa: E402
+    assembler,
+    capture_agent,
+    copywriter,
+    notifier,
+    product_scout,
+    publisher,
+)
+from agents.qa_agent import QAFailure  # noqa: E402
+from agents.qa_agent import check as run_qa  # noqa: E402
+from common.models import JobConfig  # noqa: E402
 
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "jobs.yaml"
 

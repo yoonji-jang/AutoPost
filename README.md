@@ -11,13 +11,17 @@
 Product Scout/Capture/QA/Assembler는 두 실행 경로가 공유하고, "글쓰기"만 방식이 다르다.
 
 - **경로 A (전체 자동, Anthropic API 크레딧 필요)**: `run_job.py`가 Copywriter까지 전부 자동 호출
-- **경로 B (무료, 지금 쓰는 경로)**: `prepare_job.py`로 상품/이미지만 모으고, Claude Code가
-  `skills/<style_profile>/SKILL.md` 규칙에 따라 직접 글을 쓴 뒤 `finish_job.py`로 QA·조립 마무리.
-  API 키 없이도 동작한다 — 자세한 절차는 `.claude/skills/write-daily-post/SKILL.md` 참고
+- **경로 B (무료, 지금 쓰는 경로)**: Claude Code가 먼저 WebSearch+`topic_history`로 오늘의 주제를
+  직접 정하고, `prepare_job.py --topic "..."`로 상품/이미지만 모으고,
+  `skills/<style_profile>/SKILL.md` 규칙에 따라 직접 글을 쓴 뒤 `finish_job.py`로 QA·조립 마무리,
+  `send_email.py`로 이메일 발송까지. API 키 없이도 동작한다 — 자세한 절차는
+  `.claude/skills/write-daily-post/SKILL.md` 참고. 매주 월/수/금 08:00 KST에 로컬 Windows 작업
+  스케줄러(`AutoPost-WriteDailyPost`)로 자동 실행됨
 
 ```
 경로 A: [스케줄러] → Product Scout → Capture → Copywriter(API) → QA → Assembler → Publisher(임시저장) → Notifier
-경로 B: prepare_job → Product Scout → Capture → (Claude Code가 직접 작성) → finish_job → QA → Assembler → drafts/*.html
+경로 B: (Claude Code가 트렌드 조사로 주제 선정) → prepare_job → Product Scout → Capture
+        → (Claude Code가 직접 작성) → finish_job → QA → Assembler → drafts/*.html → 이메일 발송
 ```
 
 | 구성 요소 | 역할 |
@@ -29,10 +33,11 @@ Product Scout/Capture/QA/Assembler는 두 실행 경로가 공유하고, "글쓰
 | `agents/` | 7개 에이전트 (product_scout, capture_agent, copywriter, qa_agent, assembler, publisher, notifier) |
 | `adapters/` | 몰별 어댑터. `_base_adapter.py`의 `MallAdapter` Protocol을 구현 |
 | `skills/<style_profile>/SKILL.md` | 몰별 카피 톤 규칙 |
-| `tools/` | 몰 무관 범용 유틸 (캡쳐, HTML 조립, QA 검사, 중복 방지, 네이버 OAuth) |
-| `configs/jobs.yaml` | 몰/카테고리/스케줄 설정 |
+| `tools/` | 몰 무관 범용 유틸 (캡쳐, HTML 조립, QA 검사, 중복 방지, 네이버 OAuth, 이메일 발송, 주제 이력) |
+| `configs/jobs.yaml` | 몰/카테고리/스케줄 설정. `topic`은 최초 예시일 뿐 — 실행마다 트렌드 조사로 덮어씀 |
 | `history_db/postings.db` | 중복 게시 방지용 이력 (최초 실행 시 자동 생성) |
-| `.autopost_state/`, `drafts/` | 경로 B의 중간/결과 산출물 (gitignore됨) |
+| `history_db/topic_history.json` | 최근 3주 내 다룬 주제 이력 (같은 topic 반복 방지) |
+| `.autopost_state/`, `drafts/` | 경로 B의 중간/결과 산출물 (gitignore됨, 배송은 이메일로) |
 
 자세한 설계 배경과 안전 기본값은 [`CLAUDE.md`](./CLAUDE.md) 참고.
 
@@ -55,6 +60,7 @@ cp .env.example .env
 | `ANTHROPIC_API_KEY` | 경로 A의 Copywriter가 Claude API 호출에 사용 (경로 B는 불필요) |
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` / `NAVER_REFRESH_TOKEN` | 네이버 블로그 글쓰기 오픈 API OAuth (현재 발행 자체가 보류 중) |
 | `SLACK_WEBHOOK_URL` | (선택) Notifier가 콘솔 출력 대신 Slack으로 알림 |
+| `NAVER_SMTP_USER` / `NAVER_SMTP_APP_PASSWORD` / `NOTIFY_EMAIL_TO` | 경로 B의 초안을 이메일로 보낼 때 사용 (네이버 SMTP) |
 
 ## 실행
 
@@ -63,14 +69,23 @@ cp .env.example .env
 
 ### 경로 B — 무료 (지금 쓰는 방식)
 
+가장 간단한 방법은 Claude Code에서 `/write-daily-post` 실행 (주제 선정부터 메일 발송까지 전부 처리).
+수동으로 단계를 밟으려면:
+
 ```bash
-python -m orchestrator.prepare_job --mall zigzag
+python -m tools.topic_history recent zigzag       # 최근 다룬 주제 확인 (반복 회피용)
+python -m orchestrator.prepare_job --mall zigzag --topic "플리츠 블라우스"
 # .autopost_state/<job_id>/input.json 생성됨
-# → Claude Code에게 "/write-daily-post" 실행을 맡기거나, 직접 copy.json을 작성
+# → 직접 copy.json 작성 (body/feed_captions)
 
 python -m orchestrator.finish_job <job_id>
 # QA + HTML 조립 → drafts/<job_id>.html, drafts/<job_id>_captions.json 생성
+
+python -m tools.send_email <job_id> drafts/<job_id>.html   # 이메일로 발송
 ```
+
+매주 월/수/금 08:00 KST에는 로컬 Windows 작업 스케줄러(`AutoPost-WriteDailyPost`)가
+`run_write_daily_post.bat`를 통해 위 과정 전체를 자동으로 실행한다.
 
 ### 경로 A — 전체 자동 (API 크레딧 필요)
 
@@ -99,5 +114,5 @@ python -m orchestrator.approve_and_publish --mall zigzag --category "..." --titl
 - 네이버 발행 — 보류. Client ID/Secret은 있으나 refresh_token 발급(OAuth 인가) 미완료,
   API 파라미터도 재검증 필요
 - Anthropic API 크레딧 없음 — 경로 A는 QA 이전까지만 테스트 가능. 경로 B가 현재 사실상의 운영 경로
-- 스케줄링 미구성 — 경로 B를 매일 자동 트리거하려면 Claude Code 스케줄에 등록 필요
+- 스케줄링 구성 완료 — 로컬 Windows 작업 스케줄러(월/수/금 08:00 KST)로 자동 실행됨
 - 테스트 스위트 없음

@@ -20,27 +20,34 @@ AutoPost — 여러 쇼핑몰(지그재그, 오늘의집, ...)에서 상품을 �
 [스케줄러] → Product Scout → Capture → Copywriter(API) → QA → Assembler → Publisher(임시저장) → Notifier
 ```
 
-**경로 B — 무료 (`prepare_job.py` + Claude Code + `finish_job.py`, 크레딧 불필요)**
+**경로 B — 무료 (`prepare_job.py` + Claude Code + `finish_job.py`, 크레딧 불필요, 현재 운영 경로)**
 ```
-prepare_job.py → Product Scout → Capture → .autopost_state/<job_id>/input.json 저장
+(Claude Code가 WebSearch+topic_history로 오늘의 주제를 직접 선정 — /write-daily-post 스킬 1~2단계)
                                                           ↓
-        (Claude Code가 SKILL.md 규칙대로 직접 글을 써서 copy.json 저장 — /write-daily-post 스킬)
+prepare_job.py --topic "..." → Product Scout → Capture → .autopost_state/<job_id>/input.json 저장
                                                           ↓
-finish_job.py → QA → Assembler → drafts/<job_id>.html
+        (Claude Code가 SKILL.md 규칙대로 직접 글을 써서 copy.json 저장)
+                                                          ↓
+finish_job.py → QA → Assembler → drafts/<job_id>.html → send_email.py로 메일 발송
 ```
-경로 B는 Anthropic API를 전혀 호출하지 않는다 — "글쓰기"를 Claude Code 세션(구독 한도) 자신이
-대신하기 때문. 현재 API 크레딧이 없는 상태라 실질적으로 이 경로를 쓰고 있다.
+경로 B는 Anthropic API를 전혀 호출하지 않는다 — "주제 선정"과 "글쓰기" 둘 다 Claude Code
+세션(구독 한도) 자신이 대신하기 때문. 매주 월/수/금 08:00 KST에 로컬 Windows 작업 스케줄러
+(`AutoPost-WriteDailyPost`, `run_write_daily_post.bat`가 `claude -p "/write-daily-post"
+--permission-mode bypassPermissions`를 실행)로 자동 트리거된다.
 
 - `orchestrator/job_loader.py` — `configs/jobs.yaml`에서 오늘 실행할 job을 고르는 공통 로직 (자격증명 불필요, run_job/prepare_job 둘 다 사용)
 - `orchestrator/run_job.py` — 경로 A 진입점
-- `orchestrator/prepare_job.py` / `orchestrator/finish_job.py` — 경로 B의 앞/뒤 단계. 자세한 절차는 `.claude/skills/write-daily-post/SKILL.md` 참고
+- `orchestrator/prepare_job.py` / `orchestrator/finish_job.py` — 경로 B의 앞/뒤 단계. `prepare_job.py --topic "..."`로 job.topic을 이번 실행에만 덮어쓸 수 있음. 자세한 절차는 `.claude/skills/write-daily-post/SKILL.md` 참고
 - `orchestrator/approve_and_publish.py` — 사람이 임시저장 글을 확인한 뒤 실제 발행으로 전환 (네이버 연동 보류 중이라 현재 미사용)
 - `agents/` — 7개 에이전트(product_scout, capture_agent, copywriter, qa_agent, assembler, publisher, notifier). 각자 좁은 역할 하나만 수행 (최소 권한 원칙). copywriter/publisher/notifier는 경로 B(prepare_job/finish_job)에서는 임포트되지 않음
 - `adapters/_base_adapter.py` — `MallAdapter` Protocol(search_products/get_product_detail/check_stock/get_product_url)과 `AdapterRegistry`. 새 어댑터는 모듈 import 시점에 `AdapterRegistry.register()`로 자기 자신을 등록한다 (`adapters/__init__.py` 참고)
 - `skills/<style_profile>/SKILL.md` — 몰별 카피 톤 규칙. `agents/copywriter.py`(경로 A) 또는 Claude Code 자신(경로 B, `/write-daily-post`)이 `job.style_profile`로 골라 따른다
-- `tools/` — 몰 무관 범용 유틸(playwright_capture, html_assembler, qa_checker, dedup_checker, naver_oauth_client)
+- `tools/` — 몰 무관 범용 유틸(playwright_capture, html_assembler, qa_checker, dedup_checker, naver_oauth_client, send_email, topic_history)
 - `history_db/postings.db` — (mall, category, product_id) 복합키로 중복 게시 방지. `tools/dedup_checker.py`가 최초 호출 시 스키마를 생성함
-- `.autopost_state/`, `drafts/` — 경로 B의 중간/결과 산출물, gitignore됨
+- `history_db/topic_history.json` — (date, mall, topic) 이력. `tools/topic_history.py`가 최근 3주 내 다룬 주제를
+  조회/기록해 같은 topic 반복을 피하게 함 (`configs/jobs.yaml`의 `topic` 값은 최초 예시일 뿐, 실행마다
+  WebSearch로 조사한 실제 트렌드로 덮어써야 함)
+- `.autopost_state/`, `drafts/` — 경로 B의 중간/결과 산출물, gitignore됨 (배송은 git이 아니라 이메일로 함)
 
 ## 새 쇼핑몰 추가하기
 
@@ -80,8 +87,9 @@ python -m py_compile <file>.py && ruff check .     # 문법 검사 + 린트
   (title/contents/blogId 등)도 네이버 개발자센터 최신 문서 기준 재검증 필요. 재개 전엔 경로 B로 초안까지만 생성
 - Anthropic API 크레딧 없음 — 경로 A(`run_job.py`, `agents/copywriter.py`)는 크레딧 충전 전까지 QA 이후
   단계를 테스트할 수 없음. 그 전까지는 경로 B가 사실상의 운영 경로
-- 스케줄링 미구성 — 경로 B를 매일 트리거하려면 Claude Code 스케줄(`/schedule`, cron 기반 routine)에
-  `/write-daily-post` 실행을 등록해야 함. 아직 등록 안 함
+- 스케줄링 구성 완료 — 로컬 Windows 작업 스케줄러(`AutoPost-WriteDailyPost`, 월/수/금 08:00 KST)로
+  등록됨. 클라우드 routine(`/schedule`)은 시도했으나 결과물을 사람에게 전달할 방법(git push는
+  보류, 이메일 MCP 커넥터 미연결)이 마땅치 않아 로컬 방식으로 전환함
 - 테스트 스위트 없음. 변경 후에는 최소한 `python -m py_compile` + `ruff check .`로 확인할 것
 
 ## 안전 기본값

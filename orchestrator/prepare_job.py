@@ -63,11 +63,19 @@ def prepare(job) -> Path:  # noqa: ANN001
 def main() -> None:
     parser = argparse.ArgumentParser(description="Copywriter 이전 단계(상품/이미지 수집)만 실행")
     parser.add_argument("--mall", help="특정 mall만 강제로 실행 (테스트용)")
+    parser.add_argument(
+        "--topic",
+        help="configs/jobs.yaml의 고정 topic 대신 이번 실행에만 쓸 주제로 덮어씀 "
+        "(--mall과 함께 사용)",
+    )
     args = parser.parse_args()
 
     jobs = load_jobs_for_today()
     if args.mall:
         jobs = [j for j in jobs if j.mall == args.mall]
+
+    if args.topic:
+        jobs = [dataclasses.replace(j, topic=args.topic) for j in jobs]
 
     if not jobs:
         print("오늘 예정된 job이 없습니다.")

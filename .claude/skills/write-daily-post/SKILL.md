@@ -40,6 +40,20 @@ disable-model-invocation: true
      규칙에 맞게 고쳐서 다시 5→6단계를 재시도한다 (최대 1~2회). 계속 실패하면 사람에게 보고하고 중단.
    - 성공하면 `drafts/<job_id>.html`(초안)과 `drafts/<job_id>_captions.json`(인스타 캡션)이 생성된다.
 
-7. **보고**: 어떤 job을 처리했는지, 초안 경로, QA 결과를 간단히 요약해서 알려준다.
+7. **커밋 & 푸시**: 성공한 job마다
+   ```
+   git add drafts/<job_id>.html drafts/<job_id>_captions.json
+   git commit -m "Draft: <job_id>"
+   git push origin main
+   ```
+   (스케줄 실행처럼 사람이 지켜보지 않는 컨텍스트에서만 이 커밋을 자동으로 한다. 사람이 직접
+   "오늘 초안 써줘"라고 대화 중에 요청한 경우는 커밋 전에 먼저 물어본다.)
+
+8. **알림**: PushNotification으로 결과를 한 줄로 알린다.
+   - 성공: `"오늘의 블로그 초안 준비됨: drafts/<job_id>.html (상품 N개, QA 통과)"`
+   - 신규 상품 없음/실패: 이유를 포함해 알림 (예: `"AutoPost: 오늘 지그재그 신규 상품 없음"`,
+     `"AutoPost: QA 재시도 2회 실패, 확인 필요"`)
+
+9. **보고**: 어떤 job을 처리했는지, 초안 경로, QA 결과를 간단히 요약해서 알려준다.
    네이버 발행은 이 스킬의 범위가 아니다 — 사람이 초안을 확인 후 별도로 처리한다
    (현재 네이버 연동 자체가 보류 상태임을 CLAUDE.md 참고).

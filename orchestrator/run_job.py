@@ -14,14 +14,10 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime
-from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv()  # agents.publisher/copywriter가 임포트 시점에 env var를 읽으므로 먼저 실행
-
-import yaml  # noqa: E402
 
 import adapters  # noqa: E402, F401  (import만으로 어댑터들을 AdapterRegistry에 등록)
 from agents import (  # noqa: E402
@@ -35,33 +31,9 @@ from agents import (  # noqa: E402
 from agents.qa_agent import QAFailure  # noqa: E402
 from agents.qa_agent import check as run_qa  # noqa: E402
 from common.models import JobConfig  # noqa: E402
-
-CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "jobs.yaml"
-
-WEEKDAY_CODES = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+from orchestrator.job_loader import load_jobs_for_today  # noqa: E402
 
 MAX_COPYWRITER_RETRIES = 1
-
-
-def load_jobs_for_today(today: datetime | None = None) -> list[JobConfig]:
-    today = today or datetime.now()
-    code = WEEKDAY_CODES[today.weekday()]
-
-    with open(CONFIG_PATH, encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
-
-    jobs = []
-    for entry in raw.get("jobs", []):
-        schedule = {s.strip() for s in entry.get("schedule", "").split(",") if s.strip()}
-        if not schedule or code in schedule:
-            jobs.append(
-                JobConfig(
-                    **{k: v for k, v in entry.items() if k != "schedule"},
-                    schedule=entry.get("schedule"),
-                )
-            )
-
-    return jobs
 
 
 def run_job(job: JobConfig) -> None:
@@ -96,7 +68,7 @@ def run_job(job: JobConfig) -> None:
 
     print(
         "[run_job] 임시저장 완료. 승인 후 발행하려면 "
-        "orchestrator/approve_and_publish.py를 실행하세요."
+        "python -m orchestrator.approve_and_publish 를 실행하세요."
     )
 
 
